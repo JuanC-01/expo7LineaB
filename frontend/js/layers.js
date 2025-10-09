@@ -9,7 +9,6 @@ export const layerLineas = L.geoJSON(null, {
   onEachFeature: (feature, layer) => attachPopup(layer)
 });
 
-
 export const layerBarrio = L.geoJSON(null, {
   style: { color: 'green', weight: 2, fillOpacity: 0.1 },
   onEachFeature: (feature, layer) => {

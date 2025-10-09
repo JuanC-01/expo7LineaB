@@ -20,7 +20,7 @@ import { showForm, showConfirm } from './ui.js';
 if (layerBarrio.getLayers().length) {
   const bounds = layerBarrio.getBounds();
   const center = bounds.getCenter();
-  map.setView(center, 14); 
+  map.setView(center, 16); 
 }
   console.log(' Mapa, barrio y líneas cargados correctamente');
 

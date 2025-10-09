@@ -26,7 +26,6 @@ export async function deleteLinea(id) {
   return await fetch(`${API_BASE}/lineas/${id}`, { method: 'DELETE' });
 }
 
-// ✅ IMPORTANTE: codificamos el nombre del barrio
 export async function getBarrio(nombre) {
   const res = await fetch(`${API_BASE}/barrios/${encodeURIComponent(nombre)}`);
   if (!res.ok) throw new Error('Error al cargar el barrio');
