@@ -1,6 +1,12 @@
-export async function showForm(values = {}) {
+export async function showForm(values = {}, tipo = 'línea') {
+  const esEdicion = !!values.id;
+  const titulo =
+    esEdicion
+      ? `Editar ${tipo}`
+      : `Registrar ${tipo}`;
+
   const { value: formValues } = await Swal.fire({
-    title: values.id ? 'Editar línea' : 'Nueva línea',
+    title: titulo,
     html: `
       <label>Nombre:</label>
       <input id="nombre" class="swal2-input" value="${values.nombre || ''}">
@@ -15,6 +21,7 @@ export async function showForm(values = {}) {
   });
   return formValues;
 }
+
 
 
 export async function showConfirm(text) {

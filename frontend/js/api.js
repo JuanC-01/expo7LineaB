@@ -31,3 +31,31 @@ export async function getBarrio(nombre) {
   if (!res.ok) throw new Error('Error al cargar el barrio');
   return await res.json();
 }
+
+
+// === Polígonos ===
+export async function getPoligonos() {
+  const res = await fetch(`${API_BASE}/poligonos`);
+  if (!res.ok) throw new Error('Error al cargar polígonos');
+  return await res.json();
+}
+
+export async function createPoligono(feature) {
+  return await fetch(`${API_BASE}/poligonos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(feature)
+  });
+}
+
+export async function updatePoligono(id, feature) {
+  return await fetch(`${API_BASE}/poligonos/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(feature)
+  });
+}
+
+export async function deletePoligono(id) {
+  return await fetch(`${API_BASE}/poligonos/${id}`, { method: 'DELETE' });
+}

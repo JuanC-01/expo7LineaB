@@ -26,3 +26,299 @@ html, body {
   border-radius: 4px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.3);
 }
+
+
+/* ===== Base / Layout ===== */
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    height: 100%;
+    margin: 0;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+#map {
+    width: 100%;
+    height: 100vh;
+}
+
+.attribution {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 6px 8px;
+    border-radius: 8px;
+    font-size: 11px;
+    border: 1px solid #e5e5e5;
+}
+
+
+/* ===== Leyenda ===== */
+.info {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 12px;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+    font-size: 15px;
+    line-height: 1.8;
+    color: #333;
+}
+
+.info h4 {
+    margin: 0 0 10px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #004d99;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #eee;
+}
+
+.legend {
+    line-height: 25px;
+}
+
+.legend i {
+    width: 24px;
+    height: 24px;
+    float: left;
+    margin-right: 12px;
+    border: 1px solid #777;
+    opacity: 0.9;
+    border-radius: 4px;
+}
+
+.leaflet-control-container .leaflet-top.leaflet-left {
+    margin-top: 15px;
+    margin-left: 15px;
+}
+
+.info.legend::after {
+    content: "";
+    display: block;
+    clear: both;
+}
+
+
+/* ===== Panel de Filtros ===== */
+.filter-control .filter-box {
+    background: #fff;
+    padding: 10px;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, .25);
+    width: 220px;
+    font: 14px/1.3 system-ui, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+.filter-control h4 {
+    margin: 0 0 8px;
+    font-size: 16px;
+    color: #004d99;
+}
+
+.filter-control .lbl {
+    display: block;
+    margin: 8px 0 4px;
+    font-weight: 600;
+}
+
+.filter-control input[type="text"] {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-sizing: border-box;
+}
+
+.filter-control .ranges {
+    margin-bottom: 6px;
+}
+
+.filter-control .ranges label {
+    display: block;
+    margin: 2px 0;
+}
+
+.filter-control .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.filter-control button {
+    flex: 1;
+    padding: 6px 8px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    background: #f2f2f2;
+    color: #111;
+}
+
+.filter-control .count {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #555;
+}
+
+.leaflet-top.leaflet-left .filter-control {
+    margin-top: 8px;
+}
+
+/* ===== POPUPS “barrio-popup” ===== */
+.leaflet-popup.barrio-popup .leaflet-popup-content-wrapper {
+    border-radius: 12px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, .28);
+    border: 1px solid #e8e8e8;
+}
+
+.leaflet-popup.barrio-popup .leaflet-popup-content {
+    margin: 12px 16px;
+    font-size: 14px;
+    color: #1f2937;
+}
+
+.barrio-card__title {
+    margin: 0 0 6px;
+    font-weight: 800;
+    font-size: 16px;
+    color: #111827;
+}
+
+.barrio-card__hr {
+    border: 0;
+    border-top: 1px solid #eee;
+    margin: 6px 0 8px;
+}
+
+.barrio-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    line-height: 1.4;
+}
+
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #111;
+    border: 1px solid rgba(0, 0, 0, .08);
+}
+
+.badge--low {
+    background: #E6F9E6;
+}
+
+.badge--mid {
+    background: #F0E8FF;
+}
+
+.badge--high {
+    background: #FFF8CC;
+}
+
+/* ===== ETIQUETAS (labels) ===== */
+.leaflet-tooltip.barrio-label {
+    background: #fff;
+    border: none;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, .25);
+    padding: 4px 10px;
+    font-weight: 700;
+    font-size: 12px;
+    color: #111;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+}
+
+/* ===== MarkerCluster (burbujas) ===== */
+.marker-cluster div {
+    border-radius: 50%;
+    color: #fff;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+    width: 40px;
+    height: 40px;
+    line-height: 40px;
+    text-align: center;
+    font-weight: 700;
+}
+
+.marker-cluster-small div {
+    width: 34px;
+    height: 34px;
+    line-height: 34px;
+    background: #3b82f6;
+}
+
+.marker-cluster-medium div {
+    width: 42px;
+    height: 42px;
+    line-height: 42px;
+    background: #8b5cf6;
+}
+
+.marker-cluster-large div {
+    width: 50px;
+    height: 50px;
+    line-height: 50px;
+    background: #ef4444;
+}
+
+.map-label {
+  background: transparent;
+  border: none;
+  font-weight: bold;
+  text-shadow: 1px 1px 2px #fff;
+  font-size: 13px;
+}
+
+.label-barrio {
+  color: #0b5394;
+}
+
+.label-linea {
+  color: #cc0000;
+}
+
+.label-poligono {
+  color: #38761d;
+}
+
+.route-control {
+  background: white;
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  width: 220px;
+  font-family: sans-serif;
+}
+
+.route-control h4 {
+  margin: 0 0 5px 0;
+  text-align: center;
+}
+
+.route-control select, 
+.route-control button {
+  width: 100%;
+  margin-top: 5px;
+}
+
+.route-control button {
+  background: #0078ff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px;
+  cursor: pointer;
+}
+.route-control button:hover {
+  background: #005ccc;
+}
