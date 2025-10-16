@@ -19,51 +19,28 @@ import { showForm, showConfirm } from './ui.js';
   layerPoligonos.addTo(map);
   editableLayers.addTo(map);
 
-  // === Barrios base (varios a la vez) ===
-  const misBarrios = ['TORASSO ALTO', 'VILLA CAROLINA', 'JUAN XXIII', 'PABLO VI'];
-
-  async function cargarVariosBarrios(nombres) {
+  // === Cargar TODOS los barrios ===
+  async function cargarTodosLosBarrios() {
     try {
       const API_BASE = 'http://localhost:3000';
-      const param = nombres.map(n => encodeURIComponent(n)).join(',');
-      const response = await fetch(`${API_BASE}/api/barrios?names=${param}`);
-      if (!response.ok) throw new Error('Error al cargar barrios');
+      const response = await fetch(`${API_BASE}/api/barrios/all`);
+      if (!response.ok) throw new Error('Error al cargar todos los barrios');
       const data = await response.json();
 
-      layerBarrio.clearLayers();
+      layerBarrio.clearLayers().addData(data);
 
-      L.geoJSON(data, {
-        style: f => ({
-          color: '#3388ff',
-          weight: 2,
-          fillOpacity: 0.35,
-          fillColor: getColorByArea(f.properties.shape_area)
-        }),
-        onEachFeature: (feature, layer) => {
-          const nombre = feature.properties.nombre;
-          const area = Number(feature.properties.shape_area || 0).toLocaleString('es-CO');
-          layer.bindPopup(`<b>${nombre}</b><br><small>Área: ${area} m²</small>`);
-        }
-      }).addTo(layerBarrio);
+      // Ajustar la vista a todos los barrios
+      if (layerBarrio.getLayers().length)
+        map.fitBounds(layerBarrio.getBounds());
     } catch (err) {
-      console.error('Error al cargar barrios:', err);
+      console.error('Error al cargar todos los barrios:', err);
     }
   }
 
-  // === Paleta de colores por área ===
-  function getColorByArea(a) {
-    a = Number(a) || 0;
-    return a >= 30000 ? '#ffcc00' :
-           a >= 15000 ? '#ff6600' :
-           a >= 5000  ? '#66cc00' : '#0099ff';
-  }
-
   // === Cargar datos iniciales ===
-  await cargarVariosBarrios(misBarrios);
+  await cargarTodosLosBarrios();
   await cargarLineas();
   await cargarPoligonos();
-
-  if (layerBarrio.getLayers().length) map.fitBounds(layerBarrio.getBounds());
 
   // === Agregar leyenda ===
   addLegend(map);
@@ -82,7 +59,7 @@ import { showForm, showConfirm } from './ui.js';
   };
   labelsCtl.addTo(map);
 
-  // ✅ Afecta barrios, líneas y polígonos
+  // ✅ Muestra etiquetas en barrios, líneas y polígonos
   document.addEventListener('change', e => {
     if (e.target?.id === 'chk-labels') {
       const checked = e.target.checked;
@@ -106,10 +83,9 @@ import { showForm, showConfirm } from './ui.js';
         <label>Rango de área</label>
         <select id="f-range">
           <option value="all">Todos</option>
-          <option value="small">≤ 5.000</option>
-          <option value="mid">5.001–15.000</option>
-          <option value="large">15.001–30.000</option>
-          <option value="huge">≥ 30.000</option>
+          <option value="small">≤ 20.000</option>
+          <option value="mid">20.001–50.000</option>
+          <option value="large">≥ 50.000</option>
         </select>
       </div>
     `;
@@ -117,7 +93,7 @@ import { showForm, showConfirm } from './ui.js';
     return div;
   };
   filterCtl.addTo(map);
-
+  
   // === CONTROL DE RUTAS ENTRE BARRIOS ===
 let routingControl = null;
 
@@ -257,3 +233,4 @@ document.addEventListener('click', async e => {
     await cargarLineas();
   });
 })();
+
