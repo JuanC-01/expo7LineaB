@@ -59,3 +59,9 @@ export async function updatePoligono(id, feature) {
 export async function deletePoligono(id) {
   return await fetch(`${API_BASE}/poligonos/${id}`, { method: 'DELETE' });
 }
+
+export async function getHidrografia() {
+    const res = await fetch(`${API_BASE}/hidrografia`);
+    if (!res.ok) throw new Error('Error al cargar la hidrografía');
+    return await res.json();
+}

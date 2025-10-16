@@ -7,7 +7,8 @@ import {
   getPoligonos,
   createPoligono,
   deletePoligono,
-  updatePoligono
+  updatePoligono,
+  getHidrografia    
 } from './api.js';
 import { editableLayers } from './map.js';
 import { escapeHtml } from './utils.js';
@@ -16,10 +17,13 @@ import { showForm, showConfirm } from './ui.js';
 // ========= PALETA DE COLORES POR ÁREA =========
 function getColor(a) {
   a = Number(a) || 0;
-  return a >= 50000 ? '#FFE100' : a > 20000 ? '#9112BC' : '#08CB00';
+  return a >= 100000 ? '#1d4ed8' :  
+    a >= 80000 ? '#3b82f6' :  
+      a >= 60000 ? '#60a5fa' :   
+        a >= 40000 ? '#93c5fd' :   
+          '#dbeafe'; 
 }
 
-// ========= ESTADO DE ETIQUETAS =========
 let showLabels = false;
 
 // ========= LÍNEAS =========
@@ -32,8 +36,6 @@ export async function cargarLineas() {
   const data = await getLineas();
   layerLineas.clearLayers().addData(data);
   layerLineas.eachLayer(l => editableLayers.addLayer(l));
-
-  // Si las etiquetas están activas, mostrarlas al recargar
   if (showLabels) toggleLabels(true, { lineas: layerLineas });
 }
 
@@ -51,25 +53,20 @@ export const layerBarrio = L.geoJSON(null, {
     const area = Number(props.shape_area) || 0;
     const grupo =
       area >= 50000 ? 'Grande' :
-      area > 20000 ? 'Mediano' :
-      'Pequeño';
+        area > 20000 ? 'Mediano' :
+          'Pequeño';
 
-    // Popup con info del barrio
     layer.bindPopup(`
       <h3>${escapeHtml(nombre)}</h3>
       <hr/>
       <div><b>Área:</b> ${area.toLocaleString('es-CO', { maximumFractionDigits: 2 })} m² (${grupo})</div>
     `);
-
-    // Hover visual
     layer.on({
       mouseover: e => e.target.setStyle({ weight: 3, color: '#333', fillOpacity: 0.6 }),
       mouseout: e => layerBarrio.resetStyle(e.target)
     });
 
     layer.feature = feature;
-
-    // Mostrar etiqueta si están activadas
     if (showLabels) {
       layer.bindTooltip(nombre, {
         permanent: true,
@@ -100,12 +97,31 @@ export async function cargarPoligonos() {
   const data = await getPoligonos();
   layerPoligonos.clearLayers().addData(data);
   layerPoligonos.eachLayer(l => editableLayers.addLayer(l));
-
-  // Si las etiquetas están activas, mostrarlas al recargar
   if (showLabels) toggleLabels(true, { poligonos: layerPoligonos });
 }
 
-// ========= MOSTRAR / OCULTAR ETIQUETAS =========
+// ========= HIDROGRAFÍA =========
+export const layerHidrografia = L.geoJSON(null, {
+  style: {
+    color: '#1d4ed8',     
+    weight: 2,
+    dashArray: '4,6'    
+  },
+  onEachFeature: (f, layer) => {
+    layer.bindPopup(`<b>Hidrografía:</b> ${f.properties.nombre || 'Sin nombre'}`);
+  }
+});
+
+export async function cargarHidrografia() {
+  const API_BASE = 'http://localhost:3000';
+  const response = await fetch(`${API_BASE}/api/hidrografia`);
+  if (!response.ok) throw new Error('Error al cargar la hidrografía');
+  const data = await response.json();
+  layerHidrografia.clearLayers().addData(data);
+}
+
+
+// ========= MOSTRAR/OCULTAR ETIQUETAS =========
 export function toggleLabels(visible, capas = {}) {
   showLabels = visible;
 
@@ -118,10 +134,8 @@ export function toggleLabels(visible, capas = {}) {
     group.eachLayer(layer => {
       const nombre = layer.feature?.properties?.nombre || '';
 
-      // eliminar tooltip previo
       if (layer.getTooltip()) layer.unbindTooltip();
-
-      if (visible && nombre) {
+      if (visible && nombre.toUpperCase() === 'TORASSO ALTO') {
         let clase = 'map-label';
         if (group === layerBarrio) clase = 'label-barrio';
         if (group === layerLineas) clase = 'label-linea';
@@ -140,35 +154,51 @@ export function toggleLabels(visible, capas = {}) {
 // ========= LEYENDA =========
 export function addLegend(map) {
   const legend = L.control({ position: 'topleft' });
+
   legend.onAdd = function () {
     const div = L.DomUtil.create('div', 'info legend');
-    const grades = [0, 20001, 50000];
+
+    const grades = [0, 40000, 60000, 80000, 100000];
+    const colors = grades.map(g => getColor(g));
+
     div.innerHTML = '<h4>Área (m²)</h4>';
+
     for (let i = 0; i < grades.length; i++) {
-      const from = grades[i], to = grades[i + 1];
+      const from = grades[i];
+      const to = grades[i + 1];
+
       const label = to
         ? `${from.toLocaleString()} – ${(to - 1).toLocaleString()}`
         : `≥ ${from.toLocaleString()}`;
-      div.innerHTML += `<i style="background:${getColor(from)}"></i> ${label}<br>`;
+
+      div.innerHTML += `<i style="background:${colors[i]}"></i> ${label}<br>`;
     }
+    div.innerHTML += `
+      <hr>
+      <i style="border-top: 3px dashed #1d4ed8; background: none; width: 20px; height: 0; display: inline-block; margin-right: 5px;"></i>
+      Hidrografía<br>
+    `;
+    div.innerHTML += `
+      <i style="border-top: 3px solid red; background: none; width: 20px; height: 0; display: inline-block; margin-right: 5px;"></i>
+      Ruta entre barrios
+    `;
+
     return div;
   };
+
   legend.addTo(map);
 }
 
 // ========= FILTRO POR NOMBRE Y ÁREA =========
-export function filtrarBarrios(nombreFiltro = '', rango = 'all') {
+export function filtrarBarrios(nombreFiltro = '', rango = { min: 0, max: Infinity }) {
   nombreFiltro = nombreFiltro.toLowerCase();
+  const { min, max } = rango;
 
   layerBarrio.eachLayer(l => {
     const nombre = (l.feature?.properties?.nombre || '').toLowerCase();
     const area = Number(l.feature?.properties?.shape_area) || 0;
 
-    let rangoOK = true;
-    if (rango === 'small') rangoOK = area <= 20000;
-    if (rango === 'mid') rangoOK = area > 20000 && area <= 50000;
-    if (rango === 'large') rangoOK = area > 50000;
-
+    const rangoOK = area >= min && area <= max;
     const nombreOK = nombre.includes(nombreFiltro);
     const visible = nombreOK && rangoOK;
 

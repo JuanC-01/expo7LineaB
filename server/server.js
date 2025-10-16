@@ -10,11 +10,13 @@ app.use(bodyParser.json());
 const lineasRoutes = require('./routes/lineas');
 const barriosRoutes = require('./routes/barrios');
 const poligonosRoutes = require('./routes/poligonosRoutes');
+const hidrografiaRouter = require('./routes/hidrografiaRoutes');
 
 // Registrar rutas con prefijos
 app.use('/api/lineas', lineasRoutes);
 app.use('/api/barrios', barriosRoutes);
 app.use('/api/poligonos', poligonosRoutes);
+app.use('/api/hidrografia', hidrografiaRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

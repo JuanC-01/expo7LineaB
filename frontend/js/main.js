@@ -2,7 +2,8 @@ import { initMap, editableLayers } from './map.js';
 import {
   layerLineas, cargarLineas,
   layerBarrio, addLegend, toggleLabels, filtrarBarrios,
-  layerPoligonos, cargarPoligonos
+  layerPoligonos, cargarPoligonos,
+  layerHidrografia, cargarHidrografia  
 } from './layers.js';
 import {
   createLinea, updateLinea, deleteLinea,
@@ -13,10 +14,11 @@ import { showForm, showConfirm } from './ui.js';
 (async () => {
   const map = initMap();
 
-  // === Agregar capas al mapa ===
+  // === Añadir capas al mapa ===
   layerBarrio.addTo(map);
   layerLineas.addTo(map);
   layerPoligonos.addTo(map);
+  layerHidrografia.addTo(map); 
   editableLayers.addTo(map);
 
   // === Cargar TODOS los barrios ===
@@ -28,8 +30,6 @@ import { showForm, showConfirm } from './ui.js';
       const data = await response.json();
 
       layerBarrio.clearLayers().addData(data);
-
-      // Ajustar la vista a todos los barrios
       if (layerBarrio.getLayers().length)
         map.fitBounds(layerBarrio.getBounds());
     } catch (err) {
@@ -37,12 +37,11 @@ import { showForm, showConfirm } from './ui.js';
     }
   }
 
-  // === Cargar datos iniciales ===
+  // === Cargar capas ===
   await cargarTodosLosBarrios();
   await cargarLineas();
   await cargarPoligonos();
-
-  // === Agregar leyenda ===
+  await cargarHidrografia();  
   addLegend(map);
 
   // === Control de etiquetas ===
@@ -59,7 +58,6 @@ import { showForm, showConfirm } from './ui.js';
   };
   labelsCtl.addTo(map);
 
-  // ✅ Muestra etiquetas en barrios, líneas y polígonos
   document.addEventListener('change', e => {
     if (e.target?.id === 'chk-labels') {
       const checked = e.target.checked;
@@ -80,24 +78,40 @@ import { showForm, showConfirm } from './ui.js';
         <h4>Filtros</h4>
         <label>Buscar por nombre</label>
         <input id="f-name" type="text" placeholder="Ej: Obrero" />
-        <label>Rango de área</label>
-        <select id="f-range">
-          <option value="all">Todos</option>
-          <option value="small">≤ 20.000</option>
-          <option value="mid">20.001–50.000</option>
-          <option value="large">≥ 50.000</option>
-        </select>
-      </div>
-    `;
+        <label>Área mínima (m²)</label>
+        <input id="f-min" type="number" placeholder="0" />
+        <label>Área máxima (m²)</label>
+        <input id="f-max" type="number" placeholder="1000000" />
+        <button id="btn-clear">Limpiar filtros</button>
+      </div>`;
     L.DomEvent.disableClickPropagation(div);
     return div;
   };
   filterCtl.addTo(map);
-  
-  // === CONTROL DE RUTAS ENTRE BARRIOS ===
-let routingControl = null;
 
-// Crear control de selección de barrios
+  const fName = document.getElementById('f-name');
+  const fMin = document.getElementById('f-min');
+  const fMax = document.getElementById('f-max');
+  const btnClear = document.getElementById('btn-clear');
+
+  [fName, fMin, fMax].forEach(input => {
+    input.addEventListener('input', () => {
+      const nombre = fName.value;
+      const min = Number(fMin.value) || 0;
+      const max = Number(fMax.value) || Infinity;
+      filtrarBarrios(nombre, { min, max });
+    });
+  });
+
+  btnClear.addEventListener('click', () => {
+    fName.value = '';
+    fMin.value = '';
+    fMax.value = '';
+    filtrarBarrios('', { min: 0, max: Infinity });
+  });
+
+// === Control de ruta entre barrios ===
+let routingControl = null;
 const routeCtl = L.control({ position: 'topright' });
 routeCtl.onAdd = function () {
   const div = L.DomUtil.create('div', 'route-control');
@@ -105,88 +119,63 @@ routeCtl.onAdd = function () {
     <div class="route-box">
       <h4>Ruta entre barrios</h4>
       <label>Inicio:</label>
-      <select id="sel-inicio"><option value="">Seleccionar...</option></select>
+      <select id="sel-inicio">
+        <option value="TORASSO ALTO">TORASSO ALTO</option>
+      </select>
       <label>Destino:</label>
-      <select id="sel-destino"><option value="">Seleccionar...</option></select>
+      <select id="sel-destino">
+        <option value="NUEVA COLOMBIA">NUEVA COLOMBIA</option>
+      </select>
       <button id="btn-ruta">Calcular ruta</button>
-    </div>
-  `;
+    </div>`;
   L.DomEvent.disableClickPropagation(div);
   return div;
 };
 routeCtl.addTo(map);
-
-// === Poblar selects con nombres de barrios cargados ===
-function llenarSelectsBarrios() {
-  const barrios = layerBarrio.toGeoJSON().features;
-  const inicioSel = document.getElementById('sel-inicio');
-  const destinoSel = document.getElementById('sel-destino');
-  barrios.forEach(f => {
-    const nombre = f.properties.nombre;
-    const opt1 = new Option(nombre, nombre);
-    const opt2 = new Option(nombre, nombre);
-    inicioSel.add(opt1);
-    destinoSel.add(opt2);
-  });
-}
-llenarSelectsBarrios();
-
-// === Calcular ruta cuando se presione el botón ===
-document.addEventListener('click', async e => {
-  if (e.target?.id === 'btn-ruta') {
-    const inicioNombre = document.getElementById('sel-inicio').value;
-    const destinoNombre = document.getElementById('sel-destino').value;
-    if (!inicioNombre || !destinoNombre) {
-      Swal.fire('⚠️', 'Debes seleccionar un barrio de inicio y uno de destino', 'warning');
-      return;
-    }
-
-    // Buscar los barrios en la capa
-    const inicio = layerBarrio.toGeoJSON().features.find(f => f.properties.nombre === inicioNombre);
-    const destino = layerBarrio.toGeoJSON().features.find(f => f.properties.nombre === destinoNombre);
-    if (!inicio || !destino) {
-      Swal.fire('❌', 'No se pudieron encontrar los barrios seleccionados', 'error');
-      return;
-    }
-
-    // Calcular el centro (lat, lon) de cada barrio
-    const inicioCenter = L.geoJSON(inicio).getBounds().getCenter();
-    const destinoCenter = L.geoJSON(destino).getBounds().getCenter();
-
-    // Si ya existe una ruta, eliminarla
-    if (routingControl) {
-      map.removeControl(routingControl);
-    }
-
-    // Crear la nueva ruta
-    routingControl = L.Routing.control({
-      waypoints: [inicioCenter, destinoCenter],
-      router: L.Routing.osrmv1({
-        serviceUrl: 'https://router.project-osrm.org/route/v1',
-        profile: 'driving' // puede ser driving, walking o cycling
-      }),
-      language: 'es',
-      lineOptions: { styles: [{ color: 'red', weight: 5 }] },
-      createMarker: function (i, wp) {
-        return L.marker(wp.latLng, { draggable: false })
-          .bindPopup(i === 0 ? 'Inicio: ' + inicioNombre : 'Destino: ' + destinoNombre)
-          .openPopup();
-      }
-    }).addTo(map);
+  // === Llenar selects con nombres de barrios ===
+  function llenarSelectsBarrios() {
+    const barrios = layerBarrio.toGeoJSON().features;
+    const inicioSel = document.getElementById('sel-inicio');
+    const destinoSel = document.getElementById('sel-destino');
+    barrios.forEach(f => {
+      const nombre = f.properties.nombre;
+      inicioSel.add(new Option(nombre, nombre));
+      destinoSel.add(new Option(nombre, nombre));
+    });
   }
-});
+  llenarSelectsBarrios();
 
+  // === Calcular ruta ===
+  document.addEventListener('click', async e => {
+    if (e.target?.id === 'btn-ruta') {
+      const inicioNombre = document.getElementById('sel-inicio').value;
+      const destinoNombre = document.getElementById('sel-destino').value;
+      if (!inicioNombre || !destinoNombre) {
+        Swal.fire('⚠️', 'Debes seleccionar un barrio de inicio y uno de destino', 'warning');
+        return;
+      }
 
-  document.addEventListener('input', e => {
-    if (e.target?.id === 'f-name') {
-      const rango = document.getElementById('f-range').value;
-      filtrarBarrios(e.target.value, rango);
-    }
-  });
-  document.addEventListener('change', e => {
-    if (e.target?.id === 'f-range') {
-      const nombre = document.getElementById('f-name').value;
-      filtrarBarrios(nombre, e.target.value);
+      const inicio = layerBarrio.toGeoJSON().features.find(f => f.properties.nombre === inicioNombre);
+      const destino = layerBarrio.toGeoJSON().features.find(f => f.properties.nombre === destinoNombre);
+      if (!inicio || !destino) {
+        Swal.fire('No se pudieron encontrar los barrios seleccionados', 'error');
+        return;
+      }
+
+      const inicioCenter = L.geoJSON(inicio).getBounds().getCenter();
+      const destinoCenter = L.geoJSON(destino).getBounds().getCenter();
+
+      if (routingControl) map.removeControl(routingControl);
+
+      routingControl = L.Routing.control({
+        waypoints: [inicioCenter, destinoCenter],
+        router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1', profile: 'driving' }),
+        language: 'es',
+        lineOptions: { styles: [{ color: 'red', weight: 5 }] },
+        createMarker: (i, wp) => L.marker(wp.latLng, { draggable: false })
+          .bindPopup(i === 0 ? 'Inicio: ' + inicioNombre : 'Destino: ' + destinoNombre)
+          .openPopup()
+      }).addTo(map);
     }
   });
 
@@ -195,15 +184,9 @@ document.addEventListener('click', async e => {
     const layer = e.layer;
     const feature = layer.toGeoJSON();
     const tipo = feature.geometry.type === 'Polygon' ? 'polígono' : 'línea';
-    const datos = await showForm({}, tipo);
-    feature.properties = datos;
-    if (tipo === 'polígono') {
-      await createPoligono(feature);
-      await cargarPoligonos();
-    } else {
-      await createLinea(feature);
-      await cargarLineas();
-    }
+    feature.properties = await showForm({}, tipo);
+    if (tipo === 'polígono') { await createPoligono(feature); await cargarPoligonos(); }
+    else { await createLinea(feature); await cargarLineas(); }
   });
 
   map.on(L.Draw.Event.EDITED, async e => {
@@ -232,5 +215,5 @@ document.addEventListener('click', async e => {
     await cargarPoligonos();
     await cargarLineas();
   });
-})();
 
+})();
