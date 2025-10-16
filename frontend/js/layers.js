@@ -8,20 +8,21 @@ import {
   createPoligono,
   deletePoligono,
   updatePoligono,
-  getHidrografia    
+  getHidrografia,
+  getSitios, createSitio, updateSitio, deleteSitio
 } from './api.js';
-import { editableLayers } from './map.js';
+import { editableLayers, sitiosCluster } from './map.js';
 import { escapeHtml } from './utils.js';
 import { showForm, showConfirm } from './ui.js';
 
 // ========= PALETA DE COLORES POR ÁREA =========
 function getColor(a) {
   a = Number(a) || 0;
-  return a >= 100000 ? '#1d4ed8' :  
-    a >= 80000 ? '#3b82f6' :  
-      a >= 60000 ? '#60a5fa' :   
-        a >= 40000 ? '#93c5fd' :   
-          '#dbeafe'; 
+  return a >= 100000 ? '#1d4ed8' :
+    a >= 80000 ? '#3b82f6' :
+      a >= 60000 ? '#60a5fa' :
+        a >= 40000 ? '#93c5fd' :
+          '#dbeafe';
 }
 
 let showLabels = false;
@@ -103,9 +104,9 @@ export async function cargarPoligonos() {
 // ========= HIDROGRAFÍA =========
 export const layerHidrografia = L.geoJSON(null, {
   style: {
-    color: '#1d4ed8',     
+    color: '#1d4ed8',
     weight: 2,
-    dashArray: '4,6'    
+    dashArray: '4,6'
   },
   onEachFeature: (f, layer) => {
     layer.bindPopup(`<b>Hidrografía:</b> ${f.properties.nombre || 'Sin nombre'}`);
@@ -120,11 +121,9 @@ export async function cargarHidrografia() {
   layerHidrografia.clearLayers().addData(data);
 }
 
-
 // ========= MOSTRAR/OCULTAR ETIQUETAS =========
 export function toggleLabels(visible, capas = {}) {
   showLabels = visible;
-
   const { barrios = layerBarrio, lineas = layerLineas, poligonos = layerPoligonos } = capas;
   const grupos = [barrios, lineas, poligonos];
 
@@ -157,22 +156,19 @@ export function addLegend(map) {
 
   legend.onAdd = function () {
     const div = L.DomUtil.create('div', 'info legend');
-
     const grades = [0, 40000, 60000, 80000, 100000];
     const colors = grades.map(g => getColor(g));
 
     div.innerHTML = '<h4>Área (m²)</h4>';
-
     for (let i = 0; i < grades.length; i++) {
       const from = grades[i];
       const to = grades[i + 1];
-
       const label = to
         ? `${from.toLocaleString()} – ${(to - 1).toLocaleString()}`
         : `≥ ${from.toLocaleString()}`;
-
       div.innerHTML += `<i style="background:${colors[i]}"></i> ${label}<br>`;
     }
+
     div.innerHTML += `
       <hr>
       <i style="border-top: 3px dashed #1d4ed8; background: none; width: 20px; height: 0; display: inline-block; margin-right: 5px;"></i>
@@ -182,7 +178,6 @@ export function addLegend(map) {
       <i style="border-top: 3px solid red; background: none; width: 20px; height: 0; display: inline-block; margin-right: 5px;"></i>
       Ruta entre barrios
     `;
-
     return div;
   };
 
@@ -209,7 +204,7 @@ export function filtrarBarrios(nombreFiltro = '', rango = { min: 0, max: Infinit
   });
 }
 
-// ========= POPUPS (LÍNEAS Y POLÍGONOS) =========
+// ========= POPUPS  =========
 function attachPopupLinea(layer) {
   const props = layer.feature.properties;
   const id = props.id || props.ID;
@@ -222,7 +217,6 @@ function attachPopupLinea(layer) {
   `;
 
   layer.bindPopup(html);
-
   layer.on('popupopen', e => {
     const node = e.popup._contentNode;
 
@@ -255,7 +249,6 @@ function attachPopupPoligono(layer) {
   `;
 
   layer.bindPopup(html);
-
   layer.on('popupopen', e => {
     const node = e.popup._contentNode;
 
@@ -275,3 +268,64 @@ function attachPopupPoligono(layer) {
     };
   });
 }
+
+// ========= SITIOS DE INTERÉS  =========
+export async function cargarSitios() {
+  try {
+    const data = await getSitios();
+    sitiosCluster.clearLayers();
+
+    if (!data || !data.features) return;
+
+    const puntos = L.geoJSON(data, {
+      pointToLayer: (feature, latlng) =>
+        L.marker(latlng, {
+          icon: L.icon({
+            iconUrl: 'https://cdn-icons-png.flaticon.com/512/854/854878.png',
+            iconSize: [25, 25],
+            iconAnchor: [12, 25]
+          })
+        }),
+      onEachFeature: (feature, layer) => attachPopupSitio(layer)
+    });
+
+    sitiosCluster.addLayer(puntos);
+  } catch (err) {
+    console.error('Error al cargar los sitios:', err);
+  }
+}
+
+function attachPopupSitio(layer) {
+  const props = layer.feature.properties;
+  const id = props.id;
+
+  const html = `
+    <b>${escapeHtml(props.nombre || 'Sitio sin nombre')}</b><br>
+    <hr>
+    <button class="btn-edit">Editar</button>
+    <button class="btn-delete">Eliminar</button>
+  `;
+
+  layer.bindPopup(html);
+  layer.on('popupopen', e => {
+    const node = e.popup._contentNode;
+
+    node.querySelector('.btn-delete').onclick = async () => {
+      if (await showConfirm('¿Eliminar este sitio?')) {
+        await deleteSitio(id);
+        await cargarSitios();
+      }
+    };
+
+    node.querySelector('.btn-edit').onclick = async () => {
+      const nuevo = await showForm(props, 'sitio');
+      const feature = layer.toGeoJSON();
+      feature.properties = nuevo;
+      await updateSitio(id, feature);
+      await cargarSitios();
+    };
+  });
+}
+
+export const layerSitios = sitiosCluster;
+

@@ -65,3 +65,31 @@ export async function getHidrografia() {
     if (!res.ok) throw new Error('Error al cargar la hidrografía');
     return await res.json();
 }
+
+
+// === SITIOS DE INTERÉS ===
+export async function getSitios() {
+  const res = await fetch(`${API_BASE}/sitios/all`);
+  if (!res.ok) throw new Error('Error al cargar los sitios de interés');
+  return await res.json();
+}
+
+export async function createSitio(feature) {
+  return await fetch(`${API_BASE}/sitios`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(feature)
+  });
+}
+
+export async function updateSitio(id, feature) {
+  return await fetch(`${API_BASE}/sitios/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(feature)
+  });
+}
+
+export async function deleteSitio(id) {
+  return await fetch(`${API_BASE}/sitios/${id}`, { method: 'DELETE' });
+}

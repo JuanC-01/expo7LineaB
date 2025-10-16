@@ -3,11 +3,13 @@ import {
   layerLineas, cargarLineas,
   layerBarrio, addLegend, toggleLabels, filtrarBarrios,
   layerPoligonos, cargarPoligonos,
-  layerHidrografia, cargarHidrografia  
+  layerHidrografia, cargarHidrografia,
+  layerSitios, cargarSitios   // ✅ agregado
 } from './layers.js';
 import {
   createLinea, updateLinea, deleteLinea,
-  createPoligono, updatePoligono, deletePoligono
+  createPoligono, updatePoligono, deletePoligono,
+  createSitio, updateSitio, deleteSitio           // ✅ CRUD sitios
 } from './api.js';
 import { showForm, showConfirm } from './ui.js';
 
@@ -18,7 +20,8 @@ import { showForm, showConfirm } from './ui.js';
   layerBarrio.addTo(map);
   layerLineas.addTo(map);
   layerPoligonos.addTo(map);
-  layerHidrografia.addTo(map); 
+  layerHidrografia.addTo(map);
+  layerSitios.addTo(map);   // ✅ Sitios de Interés
   editableLayers.addTo(map);
 
   // === Cargar TODOS los barrios ===
@@ -41,7 +44,8 @@ import { showForm, showConfirm } from './ui.js';
   await cargarTodosLosBarrios();
   await cargarLineas();
   await cargarPoligonos();
-  await cargarHidrografia();  
+  await cargarHidrografia();
+  await cargarSitios();     // ✅ carga Sitios de Interés
   addLegend(map);
 
   // === Control de etiquetas ===
@@ -110,28 +114,29 @@ import { showForm, showConfirm } from './ui.js';
     filtrarBarrios('', { min: 0, max: Infinity });
   });
 
-// === Control de ruta entre barrios ===
-let routingControl = null;
-const routeCtl = L.control({ position: 'topright' });
-routeCtl.onAdd = function () {
-  const div = L.DomUtil.create('div', 'route-control');
-  div.innerHTML = `
-    <div class="route-box">
-      <h4>Ruta entre barrios</h4>
-      <label>Inicio:</label>
-      <select id="sel-inicio">
-        <option value="TORASSO ALTO">TORASSO ALTO</option>
-      </select>
-      <label>Destino:</label>
-      <select id="sel-destino">
-        <option value="NUEVA COLOMBIA">NUEVA COLOMBIA</option>
-      </select>
-      <button id="btn-ruta">Calcular ruta</button>
-    </div>`;
-  L.DomEvent.disableClickPropagation(div);
-  return div;
-};
-routeCtl.addTo(map);
+  // === Control de ruta entre barrios ===
+  let routingControl = null;
+  const routeCtl = L.control({ position: 'topright' });
+  routeCtl.onAdd = function () {
+    const div = L.DomUtil.create('div', 'route-control');
+    div.innerHTML = `
+      <div class="route-box">
+        <h4>Ruta entre barrios</h4>
+        <label>Inicio:</label>
+        <select id="sel-inicio">
+          <option value="TORASSO ALTO">TORASSO ALTO</option>
+        </select>
+        <label>Destino:</label>
+        <select id="sel-destino">
+          <option value="NUEVA COLOMBIA">NUEVA COLOMBIA</option>
+        </select>
+        <button id="btn-ruta">Calcular ruta</button>
+      </div>`;
+    L.DomEvent.disableClickPropagation(div);
+    return div;
+  };
+  routeCtl.addTo(map);
+
   // === Llenar selects con nombres de barrios ===
   function llenarSelectsBarrios() {
     const barrios = layerBarrio.toGeoJSON().features;
@@ -178,42 +183,92 @@ routeCtl.addTo(map);
       }).addTo(map);
     }
   });
+// === Eventos de dibujo ===
+map.on(L.Draw.Event.CREATED, async e => {
+  const layer = e.layer;
+  const feature = layer.toGeoJSON();
 
-  // === Eventos de dibujo ===
-  map.on(L.Draw.Event.CREATED, async e => {
-    const layer = e.layer;
-    const feature = layer.toGeoJSON();
-    const tipo = feature.geometry.type === 'Polygon' ? 'polígono' : 'línea';
-    feature.properties = await showForm({}, tipo);
-    if (tipo === 'polígono') { await createPoligono(feature); await cargarPoligonos(); }
-    else { await createLinea(feature); await cargarLineas(); }
-  });
+  // Detectar tipo geométrico
+  const tipo = feature.geometry.type === 'Polygon'
+    ? 'polígono'
+    : feature.geometry.type === 'LineString'
+      ? 'línea'
+      : 'sitio'; // ✅ para Point
 
-  map.on(L.Draw.Event.EDITED, async e => {
+  // Mostrar formulario y capturar propiedades
+  feature.properties = await showForm({}, tipo);
+
+  try {
+    if (tipo === 'polígono') {
+      await createPoligono(feature);
+      await cargarPoligonos();
+    } else if (tipo === 'línea') {
+      await createLinea(feature);
+      await cargarLineas();
+    } else if (tipo === 'sitio') {
+      await createSitio(feature);
+      await cargarSitios();
+    }
+  } catch (err) {
+    console.error('Error al crear elemento:', err);
+    Swal.fire('❌', 'Error al crear el elemento', 'error');
+  }
+});
+
+map.on(L.Draw.Event.EDITED, async e => {
+  try {
     for (const id in e.layers._layers) {
       const layer = e.layers._layers[id];
       const feature = layer.toGeoJSON();
       const fid = feature.properties?.id;
-      if (feature.geometry.type === 'Polygon' && fid) await updatePoligono(fid, feature);
-      else if (feature.geometry.type === 'LineString' && fid) await updateLinea(fid, feature);
-    }
-    await cargarPoligonos();
-    await cargarLineas();
-  });
+      if (!fid) continue;
 
-  map.on(L.Draw.Event.DELETED, async e => {
+      if (feature.geometry.type === 'Polygon') {
+        await updatePoligono(fid, feature);
+      } else if (feature.geometry.type === 'LineString') {
+        await updateLinea(fid, feature);
+      } else if (feature.geometry.type === 'Point') {
+        await updateSitio(fid, feature);
+      }
+    }
+
+    await Promise.all([
+      cargarPoligonos(),
+      cargarLineas(),
+      cargarSitios()
+    ]);
+  } catch (err) {
+    console.error('Error al editar elemento:', err);
+    Swal.fire('❌', 'Error al editar el elemento', 'error');
+  }
+});
+
+map.on(L.Draw.Event.DELETED, async e => {
+  try {
     for (const id in e.layers._layers) {
       const layer = e.layers._layers[id];
       const fid = layer.feature?.properties?.id;
       if (!fid) continue;
+
       if (layer.feature.geometry.type === 'Polygon') {
         if (await showConfirm('¿Eliminar este polígono?')) await deletePoligono(fid);
       } else if (layer.feature.geometry.type === 'LineString') {
         if (await showConfirm('¿Eliminar esta línea?')) await deleteLinea(fid);
+      } else if (layer.feature.geometry.type === 'Point') {
+        if (await showConfirm('¿Eliminar este sitio de interés?')) await deleteSitio(fid);
       }
     }
-    await cargarPoligonos();
-    await cargarLineas();
-  });
+
+    await Promise.all([
+      cargarPoligonos(),
+      cargarLineas(),
+      cargarSitios()
+    ]);
+  } catch (err) {
+    console.error('Error al eliminar elemento:', err);
+    Swal.fire('', 'Error al eliminar el elemento', 'error');
+  }
+});
+
 
 })();
