@@ -147,3 +147,37 @@ export async function deleteEquipamiento(gid) {
   if (!response.ok) throw new Error(`Error al eliminar equipamiento ${gid}: ${response.statusText}`);
   return await response.json();
 }
+
+// === CONSULTAS ESPACIALES ===
+export async function ejecutarInterseccion(geometry, filtros = {}) {
+  const params = new URLSearchParams();
+  // Construye los parámetros de filtro (tipo, nombre, etc.) si existen
+  if (filtros.tipo && filtros.tipo.length > 0) params.append('tipo', filtros.tipo.join(','));
+  if (filtros.nombre) params.append('nombre', filtros.nombre); // Si tienes filtro de nombre para equip
+
+  const url = `${API_BASE}/consultas/interseccion?${params.toString()}`;
+  const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ geometry }) // Enviar la geometría en el cuerpo
+  });
+  if (!response.ok) throw new Error(`Error en consulta de intersección: ${response.statusText}`);
+  return await response.json(); // Espera FeatureCollection
+}
+
+export async function ejecutarBuffer(centro, radio, filtros = {}) {
+    const params = new URLSearchParams();
+    // Construye los parámetros de filtro
+    if (filtros.tipo && filtros.tipo.length > 0) params.append('tipo', filtros.tipo.join(','));
+    if (filtros.nombre) params.append('nombre', filtros.nombre);
+
+    const url = `${API_BASE}/consultas/buffer?${params.toString()}`;
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ centro, radio }) // Enviar centro [lon, lat] y radio
+    });
+    if (!response.ok) throw new Error(`Error en consulta de buffer: ${response.statusText}`);
+    // Espera FeatureCollection con propiedad 'distancia' en properties
+    return await response.json();
+}

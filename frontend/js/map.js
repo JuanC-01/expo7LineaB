@@ -1,7 +1,7 @@
 import 'https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js';
 
 export const editableLayers = new L.FeatureGroup();
-export const sitiosCluster = L.markerClusterGroup(); // ✅ nuevo grupo para clustering
+export const sitiosCluster = L.markerClusterGroup(); 
 
 export function initMap() {
   const map = L.map('map').setView([1.6133, -75.6061], 14);
@@ -13,7 +13,7 @@ export function initMap() {
 
   // === Agregar capas al mapa ===
   editableLayers.addTo(map);
-  sitiosCluster.addTo(map); // ✅ capa para los puntos agrupados
+  sitiosCluster.addTo(map); 
 
   // === Herramientas de dibujo ===
   const drawControl = new L.Control.Draw({

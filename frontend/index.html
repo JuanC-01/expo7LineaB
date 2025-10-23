@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -49,9 +50,66 @@
     <label><input type="checkbox" id="chkResultados"> Resultados</label>
   </div>
 
+  <!-- ✅ PANEL DE REPORTES -->
+  <div id="panel-reportes" class="panel">
+    <h3>📊 Reportes de Consultas</h3>
+
+    <!-- Resumen por tipo -->
+    <div id="resumen-tipo" class="subpanel">
+      <h4>Resumen por tipo</h4>
+      <ul id="lista-resumen">
+        <!-- Se llenará dinámicamente -->
+        <li>Educación: 0</li>
+        <li>Salud: 0</li>
+        <li>Seguridad: 0</li>
+      </ul>
+    </div>
+
+    <!-- Detalle por punto -->
+    <div id="detalle-equipamientos" class="subpanel">
+      <h4>Detalle de Equipamientos</h4>
+      <table id="tabla-equipamientos">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Tipo</th>
+            <th>Barrio</th>
+            <th>Distancia (m)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Se llenará dinámicamente -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="panel-consultas" class="panel1">
+    <h3>Consultas</h3>
+    <div class="subpanel">
+      <h4>Buffer por Clic</h4>
+      <label for="buffer-radius">Radio (m):</label>
+      <input type="number" id="buffer-radius" value="250" min="10" style="width: 80px;">
+      <button id="btn-activar-buffer">Activar Buffer</button>
+      <p id="buffer-status" style="font-size: 0.8em; color: grey;"></p>
+    </div>
+    <div class="subpanel">
+  <h4>Buscador</h4>
+  <input type="text" id="search-input" placeholder="Buscar por nombre..." style="width: 100%;">
+  <button id="btn-buscar">Buscar</button>
+  <ul id="search-results" style="font-size:0.9em; color:#333; margin-top:8px;"></ul>
+</div>
+
+  </div>
+
+
+
+  <div id="map"></div>
+
   <div id="map"></div>
 
   <!-- Tu script principal -->
   <script type="module" src="js/main.js"></script>
 </body>
+
 </html>

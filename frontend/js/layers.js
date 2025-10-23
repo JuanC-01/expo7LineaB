@@ -29,6 +29,98 @@ function getColor(a) {
 
 let showLabels = false;
 
+let centroBufferMarker = null;
+
+const estiloResultadosConsulta = {
+    radius: 7,
+    fillColor: "#ff7800",
+    color: "#000",
+    weight: 1,
+    opacity: 1,
+    fillOpacity: 0.7
+};
+
+const estiloCentroBuffer = {
+    radius: 5,
+    fillColor: "#e31a1c", 
+    color: "#000",
+    weight: 1,
+    opacity: 1,
+    fillOpacity: 0.9
+};
+
+// --- FUNCIÓN PARA MOSTRAR RESULTADOS ---
+export function mostrarResultadosConsulta(map, layerResultados, features, tipoConsulta = 'Intersección', infoExtra = {}) {
+    layerResultados.clearLayers(); 
+    if (centroBufferMarker) {
+        map.removeLayer(centroBufferMarker);
+        centroBufferMarker = null;
+    }
+
+    // Si es buffer, marca el centro
+    if (tipoConsulta === 'Buffer' && infoExtra.centro) {
+        const latLngCentro = [infoExtra.centro[1], infoExtra.centro[0]];
+        centroBufferMarker = L.circleMarker(latLngCentro, estiloCentroBuffer)
+            .bindTooltip("Centro del Buffer")
+            .addTo(map); 
+
+         const bufferCircle = L.circle(latLngCentro, {
+            radius: infoExtra.radio,
+            color: 'orange',
+            fillColor: '#ff7800',
+            fillOpacity: 0.1,
+            weight: 2,
+            interactive: false 
+        });
+        layerResultados.addLayer(bufferCircle); 
+    }
+
+    // Añadir los puntos encontrados
+    const resultadosGeoJSON = L.geoJSON({ type: 'FeatureCollection', features: features }, {
+        pointToLayer: (feature, latlng) => {
+            return L.circleMarker(latlng, estiloResultadosConsulta);
+        },
+        onEachFeature: (feature, layer) => {
+            let popupContent = `<b>${feature.properties.nombre || 'Sin Nombre'}</b><br>Tipo: ${feature.properties.tipo || 'N/A'}`;
+            if (feature.properties.distancia !== undefined) {
+                popupContent += `<br>Distancia: ${feature.properties.distancia.toFixed(1)} m`;
+            }
+            layer.bindPopup(popupContent);
+             layer.bindTooltip(`<b>${feature.properties.nombre}</b><br>${feature.properties.tipo}`);
+        }
+    });
+
+    layerResultados.addLayer(resultadosGeoJSON); 
+    const chkResultados = document.getElementById('chkResultados');
+    if (chkResultados && chkResultados.checked && !map.hasLayer(layerResultados)) {
+        map.addLayer(layerResultados);
+    }
+
+    // Ajustar mapa a los resultados
+    if (features && features.length > 0) {
+        let boundsTarget = resultadosGeoJSON.getBounds();
+
+        if (tipoConsulta === 'Buffer' && centroBufferMarker) {
+            boundsTarget.extend(centroBufferMarker.getLatLng());
+        }
+       if (boundsTarget.isValid()) {
+            map.fitBounds(boundsTarget.pad(0.1)); 
+        }
+    } else if (tipoConsulta === 'Buffer' && centroBufferMarker) {
+         map.setView(centroBufferMarker.getLatLng(), 15); 
+    }
+}
+
+// --- FUNCIÓN PARA LIMPIAR RESULTADOS ---
+export function limpiarResultadosConsulta(map, layerResultados) {
+    layerResultados.clearLayers();
+    if (centroBufferMarker) {
+        map.removeLayer(centroBufferMarker);
+        centroBufferMarker = null;
+    }
+    actualizarPanelReportes([]);
+}
+
 // ========= LÍNEAS =========
 export const layerLineas = L.geoJSON(null, {
   style: { color: 'red', weight: 3 },

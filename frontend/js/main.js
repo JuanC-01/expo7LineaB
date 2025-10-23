@@ -5,37 +5,39 @@ import {
   layerPoligonos, cargarPoligonos,
   layerHidrografia, cargarHidrografia,
   layerSitios, cargarSitios,
-  layerEquipamientos, cargarEquipamientos, setupEquipamientoEventHandlers 
+  layerEquipamientos, cargarEquipamientos, setupEquipamientoEventHandlers,
+  mostrarResultadosConsulta, limpiarResultadosConsulta
 } from './layers.js';
 import {
   createLinea, updateLinea, deleteLinea,
   createPoligono, updatePoligono, deletePoligono,
-  createSitio, updateSitio, deleteSitio, createEquipamiento 
+  createSitio, updateSitio, deleteSitio, createEquipamiento,
+  ejecutarInterseccion, ejecutarBuffer
 } from './api.js';
 import { showForm, showConfirm } from './ui.js';
+import { escapeHtml } from './utils.js';
 
 (async () => {
   const map = initMap();
 
-  // === Añadir capas al mapa ===
+  // === Capas base ===
   layerBarrio.addTo(map);
   layerLineas.addTo(map);
   layerPoligonos.addTo(map);
   layerHidrografia.addTo(map);
   layerSitios.addTo(map);
-  layerEquipamientos.addTo(map);   
+  layerEquipamientos.addTo(map);
   editableLayers.addTo(map);
+  setupEquipamientoEventHandlers(map);
+  addLegend(map);
 
-  setupEquipamientoEventHandlers(map);  
-
-  // === Cargar TODOS los barrios ===
+  // === Cargar datos ===
+  const API_BASE = 'http://localhost:3000';
   async function cargarTodosLosBarrios() {
     try {
-      const API_BASE = 'http://localhost:3000';
       const response = await fetch(`${API_BASE}/api/barrios/all`);
       if (!response.ok) throw new Error('Error al cargar todos los barrios');
       const data = await response.json();
-
       layerBarrio.clearLayers().addData(data);
       if (layerBarrio.getLayers().length)
         map.fitBounds(layerBarrio.getBounds());
@@ -43,19 +45,16 @@ import { showForm, showConfirm } from './ui.js';
       console.error('Error al cargar todos los barrios:', err);
     }
   }
-
-  // === Cargar capas ===
   await cargarTodosLosBarrios();
   await cargarLineas();
   await cargarPoligonos();
   await cargarHidrografia();
   await cargarSitios();
-  await cargarEquipamientos();      
-  addLegend(map);
+  await cargarEquipamientos();
 
-  // === Control de etiquetas ===
-  const labelsCtl = L.control({ position: 'topleft' });
-  labelsCtl.onAdd = function () {
+  // === Etiquetas ===
+  const chkLabelsCtl = L.control({ position: 'topleft' });
+  chkLabelsCtl.onAdd = () => {
     const div = L.DomUtil.create('div', 'info');
     div.innerHTML = `
       <label style="display:flex;gap:6px;align-items:center;">
@@ -65,12 +64,11 @@ import { showForm, showConfirm } from './ui.js';
     L.DomEvent.disableClickPropagation(div);
     return div;
   };
-  labelsCtl.addTo(map);
+  chkLabelsCtl.addTo(map);
 
   document.addEventListener('change', e => {
     if (e.target?.id === 'chk-labels') {
-      const checked = e.target.checked;
-      toggleLabels(checked, {
+      toggleLabels(e.target.checked, {
         barrios: layerBarrio,
         lineas: layerLineas,
         poligonos: layerPoligonos
@@ -80,7 +78,7 @@ import { showForm, showConfirm } from './ui.js';
 
   // === Panel de filtros ===
   const filterCtl = L.control({ position: 'topleft' });
-  filterCtl.onAdd = function () {
+  filterCtl.onAdd = () => {
     const div = L.DomUtil.create('div', 'filter-control');
     div.innerHTML = `
       <div class="filter-box">
@@ -102,7 +100,6 @@ import { showForm, showConfirm } from './ui.js';
   const fMin = document.getElementById('f-min');
   const fMax = document.getElementById('f-max');
   const btnClear = document.getElementById('btn-clear');
-
   [fName, fMin, fMax].forEach(input => {
     input.addEventListener('input', () => {
       const nombre = fName.value;
@@ -111,7 +108,6 @@ import { showForm, showConfirm } from './ui.js';
       filtrarBarrios(nombre, { min, max });
     });
   });
-
   btnClear.addEventListener('click', () => {
     fName.value = '';
     fMin.value = '';
@@ -119,22 +115,18 @@ import { showForm, showConfirm } from './ui.js';
     filtrarBarrios('', { min: 0, max: Infinity });
   });
 
-  // === Control de ruta entre barrios ===
+  // === Routing entre barrios ===
   let routingControl = null;
   const routeCtl = L.control({ position: 'topright' });
-  routeCtl.onAdd = function () {
+  routeCtl.onAdd = () => {
     const div = L.DomUtil.create('div', 'route-control');
     div.innerHTML = `
       <div class="route-box">
         <h4>Ruta entre barrios</h4>
         <label>Inicio:</label>
-        <select id="sel-inicio">
-          <option value="TORASSO ALTO">TORASSO ALTO</option>
-        </select>
+        <select id="sel-inicio"></select>
         <label>Destino:</label>
-        <select id="sel-destino">
-          <option value="NUEVA COLOMBIA">NUEVA COLOMBIA</option>
-        </select>
+        <select id="sel-destino"></select>
         <button id="btn-ruta">Calcular ruta</button>
       </div>`;
     L.DomEvent.disableClickPropagation(div);
@@ -142,7 +134,6 @@ import { showForm, showConfirm } from './ui.js';
   };
   routeCtl.addTo(map);
 
-  // === Llenar selects con nombres de barrios ===
   function llenarSelectsBarrios() {
     const barrios = layerBarrio.toGeoJSON().features;
     const inicioSel = document.getElementById('sel-inicio');
@@ -155,182 +146,246 @@ import { showForm, showConfirm } from './ui.js';
   }
   llenarSelectsBarrios();
 
-  // === Calcular ruta ===
   document.addEventListener('click', async e => {
     if (e.target?.id === 'btn-ruta') {
       const inicioNombre = document.getElementById('sel-inicio').value;
       const destinoNombre = document.getElementById('sel-destino').value;
-      if (!inicioNombre || !destinoNombre) {
-        Swal.fire('⚠️', 'Debes seleccionar un barrio de inicio y uno de destino', 'warning');
-        return;
-      }
-
       const inicio = layerBarrio.toGeoJSON().features.find(f => f.properties.nombre === inicioNombre);
       const destino = layerBarrio.toGeoJSON().features.find(f => f.properties.nombre === destinoNombre);
-      if (!inicio || !destino) {
-        Swal.fire('No se pudieron encontrar los barrios seleccionados', 'error');
-        return;
-      }
-
+      if (!inicio || !destino) return Swal.fire('⚠️', 'Selecciona barrios válidos', 'warning');
       const inicioCenter = L.geoJSON(inicio).getBounds().getCenter();
       const destinoCenter = L.geoJSON(destino).getBounds().getCenter();
-
       if (routingControl) map.removeControl(routingControl);
-
       routingControl = L.Routing.control({
         waypoints: [inicioCenter, destinoCenter],
         router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1', profile: 'driving' }),
-        language: 'es',
         lineOptions: { styles: [{ color: 'red', weight: 5 }] },
-        createMarker: (i, wp) => L.marker(wp.latLng, { draggable: false })
-          .bindPopup(i === 0 ? 'Inicio: ' + inicioNombre : 'Destino: ' + destinoNombre)
-          .openPopup()
+        language: 'es'
       }).addTo(map);
     }
   });
 
-  // === Eventos de dibujo ===
+  // === Eventos de dibujo CRUD ===
   map.on(L.Draw.Event.CREATED, async e => {
-  const layer = e.layer;
-  const feature = layer.toGeoJSON();
-
-  let tipo;
-
-  if (feature.geometry.type === 'Polygon') {
-    tipo = 'polígono';
-  } else if (feature.geometry.type === 'LineString') {
-    tipo = 'línea';
-  } else if (feature.geometry.type === 'Point') {
-    const { value: tipoPunto } = await Swal.fire({
-      title: 'Nuevo punto',
-      text: '¿Qué tipo de punto deseas registrar?',
-      input: 'select',
-      inputOptions: {
-        sitio: 'Sitio de interés',
-        equipamiento: 'Equipamiento'
-      },
-      inputPlaceholder: 'Selecciona tipo',
-      showCancelButton: true,
-      confirmButtonText: 'Continuar',
-      cancelButtonText: 'Cancelar'
-    });
-
-    if (!tipoPunto) return; 
-    tipo = tipoPunto;
-  }
-
-  feature.properties = await showForm({}, tipo);
-
-  try {
-    if (tipo === 'polígono') {
-      await createPoligono(feature);
-      await cargarPoligonos();
-    } else if (tipo === 'línea') {
-      await createLinea(feature);
-      await cargarLineas();
-    } else if (tipo === 'sitio') {
-      await createSitio(feature);
-      await cargarSitios();
-    } else if (tipo === 'equipamiento') {  
-      await createEquipamiento(feature);
-      await cargarEquipamientos();
+    const layer = e.layer;
+    const feature = layer.toGeoJSON();
+    let tipo;
+    if (feature.geometry.type === 'Polygon') tipo = 'polígono';
+    else if (feature.geometry.type === 'LineString') tipo = 'línea';
+    else if (feature.geometry.type === 'Point') {
+      const { value: tipoPunto } = await Swal.fire({
+        title: 'Nuevo punto',
+        text: '¿Qué tipo de punto deseas registrar?',
+        input: 'select',
+        inputOptions: { sitio: 'Sitio de interés', equipamiento: 'Equipamiento' },
+        inputPlaceholder: 'Selecciona tipo',
+        showCancelButton: true
+      });
+      if (!tipoPunto) return;
+      tipo = tipoPunto;
     }
-
-    Swal.fire( 'Elemento creado correctamente', 'success');
-  } catch (err) {
-    console.error('Error al crear elemento:', err);
-    Swal.fire('Error al crear el elemento', 'error');
-  }
-});
-
-
-  map.on(L.Draw.Event.EDITED, async e => {
+    feature.properties = await showForm({}, tipo);
     try {
-      for (const id in e.layers._layers) {
-        const layer = e.layers._layers[id];
-        const feature = layer.toGeoJSON();
-        const fid = feature.properties?.id;
-        if (!fid) continue;
-
-        if (feature.geometry.type === 'Polygon') {
-          await updatePoligono(fid, feature);
-        } else if (feature.geometry.type === 'LineString') {
-          await updateLinea(fid, feature);
-        } else if (feature.geometry.type === 'Point') {
-          await updateSitio(fid, feature);
-        }
-      }
-
-      await Promise.all([
-        cargarPoligonos(),
-        cargarLineas(),
-        cargarSitios(),
-        cargarEquipamientos()   
-      ]);
+      if (tipo === 'polígono') await createPoligono(feature);
+      else if (tipo === 'línea') await createLinea(feature);
+      else if (tipo === 'sitio') await createSitio(feature);
+      else if (tipo === 'equipamiento') await createEquipamiento(feature);
+      await Promise.all([cargarPoligonos(), cargarLineas(), cargarSitios(), cargarEquipamientos()]);
+      Swal.fire('Éxito', 'Elemento creado correctamente', 'success');
     } catch (err) {
-      console.error('Error al editar elemento:', err);
-      Swal.fire('Error al editar el elemento', 'error');
+      Swal.fire('Error', 'No se pudo crear el elemento', 'error');
     }
+  });
+
+  // === Edición y eliminación ===
+  map.on(L.Draw.Event.EDITED, async e => {
+    for (const id in e.layers._layers) {
+      const layer = e.layers._layers[id];
+      const feature = layer.toGeoJSON();
+      const fid = feature.properties?.id;
+      if (!fid) continue;
+      if (feature.geometry.type === 'Polygon') await updatePoligono(fid, feature);
+      else if (feature.geometry.type === 'LineString') await updateLinea(fid, feature);
+      else if (feature.geometry.type === 'Point') await updateSitio(fid, feature);
+    }
+    await Promise.all([cargarPoligonos(), cargarLineas(), cargarSitios(), cargarEquipamientos()]);
   });
 
   map.on(L.Draw.Event.DELETED, async e => {
-    try {
-      for (const id in e.layers._layers) {
-        const layer = e.layers._layers[id];
-        const fid = layer.feature?.properties?.id;
-        if (!fid) continue;
-
-        if (layer.feature.geometry.type === 'Polygon') {
-          if (await showConfirm('¿Eliminar este polígono?')) await deletePoligono(fid);
-        } else if (layer.feature.geometry.type === 'LineString') {
-          if (await showConfirm('¿Eliminar esta línea?')) await deleteLinea(fid);
-        } else if (layer.feature.geometry.type === 'Point') {
-          if (await showConfirm('¿Eliminar este sitio de interés?')) await deleteSitio(fid);
-        }
+    for (const id in e.layers._layers) {
+      const layer = e.layers._layers[id];
+      const fid = layer.feature?.properties?.id;
+      if (!fid) continue;
+      if (layer.feature.geometry.type === 'Polygon') {
+        if (await showConfirm('¿Eliminar polígono?')) await deletePoligono(fid);
+      } else if (layer.feature.geometry.type === 'LineString') {
+        if (await showConfirm('¿Eliminar línea?')) await deleteLinea(fid);
+      } else if (layer.feature.geometry.type === 'Point') {
+        if (await showConfirm('¿Eliminar punto?')) await deleteSitio(fid);
       }
+    }
+    await Promise.all([cargarPoligonos(), cargarLineas(), cargarSitios(), cargarEquipamientos()]);
+  });
 
-      await Promise.all([
-        cargarPoligonos(),
-        cargarLineas(),
-        cargarSitios(),
-        cargarEquipamientos()  
-      ]);
-    } catch (err) {
-      console.error('Error al eliminar elemento:', err);
-      Swal.fire('', 'Error al eliminar el elemento', 'error');
+  // === Checkboxes de capas ===
+  const layerResultados = L.geoJSON(null, { color: 'orange' }).addTo(map);
+  function toggleLayer(visible, layer) { visible ? map.addLayer(layer) : map.removeLayer(layer); }
+  document.getElementById('chkBarrios').onchange = e => toggleLayer(e.target.checked, layerBarrio);
+  document.getElementById('chkHidrografia').onchange = e => toggleLayer(e.target.checked, layerHidrografia);
+  document.getElementById('chkEquipamientos').onchange = e => toggleLayer(e.target.checked, layerEquipamientos);
+  document.getElementById('chkSitios').onchange = e => toggleLayer(e.target.checked, layerSitios);
+  document.getElementById('chkResultados').onchange = e => toggleLayer(e.target.checked, layerResultados);
+
+  // === CONSULTAS ESPACIALES ===
+  const btnBuffer = document.getElementById('btn-activar-buffer');
+  const radiusInput = document.getElementById('buffer-radius');
+  const statusText = document.getElementById('buffer-status');
+  let bufferActivo = false;
+
+  btnBuffer.addEventListener('click', () => {
+    bufferActivo = !bufferActivo;
+    btnBuffer.textContent = bufferActivo ? 'Cancelar' : 'Activar Buffer';
+    statusText.textContent = bufferActivo ? 'Haz clic en el mapa para generar buffer.' : '';
+    if (bufferActivo) {
+      map.once('click', async e => {
+        bufferActivo = false;
+        btnBuffer.textContent = 'Activar Buffer';
+        statusText.textContent = '';
+        const radio = parseFloat(radiusInput.value) || 200;
+        const centro = [e.latlng.lng, e.latlng.lat];
+        try {
+          const result = await ejecutarBuffer(centro, radio);
+          mostrarResultadosConsulta(map, layerResultados, result.features, 'Buffer', { centro, radio });
+          actualizarPanelReportes(result.features);
+        } catch (err) {
+          Swal.fire('Error', 'No se pudo ejecutar la consulta buffer', 'error');
+        }
+      });
     }
   });
 
-  let layerResultados = L.geoJSON(null, { color: 'orange' }); //
-map.addLayer(layerResultados); 
+  // === INTERSECCIÓN (dibujar polígono) ===
+  map.on(L.Draw.Event.CREATED, async e => {
+    if (e.layerType === 'polygon' && e.layer.options.color === 'blue') {
+      const feature = e.layer.toGeoJSON();
+      try {
+        const result = await ejecutarInterseccion(feature.geometry);
+        mostrarResultadosConsulta(map, layerResultados, result.features, 'Intersección');
+        actualizarPanelReportes(result.features);
+      } catch (err) {
+        Swal.fire('Error', 'No se pudo ejecutar la intersección', 'error');
+      }
+    }
+  });
 
-// Asocia cada checkbox a una capa
-document.getElementById('chkBarrios').addEventListener('change', (e) => {
-  toggleLayer(e.target.checked, layerBarrio);
-});
+  // === PANEL DE REPORTES ===
+  window.actualizarPanelReportes = function (features = []) {
+    const tbody = document.querySelector('#tabla-equipamientos tbody');
+    const listaResumen = document.getElementById('lista-resumen');
+    if (!features.length) {
+      tbody.innerHTML = '<tr><td colspan="4">Sin resultados</td></tr>';
+      listaResumen.innerHTML = '<li>Sin datos</li>';
+      return;
+    }
+    tbody.innerHTML = features.map(f => {
+      const p = f.properties || {};
+      return `<tr>
+        <td>${escapeHtml(p.nombre || 'N/A')}</td>
+        <td>${escapeHtml(p.tipo || 'N/A')}</td>
+        <td>${escapeHtml(p.barrio || 'N/A')}</td>
+        <td>${p.distancia ? p.distancia.toFixed(1) : '-'}</td>
+      </tr>`;
+    }).join('');
+    const resumen = {};
+    features.forEach(f => {
+      const tipo = f.properties?.tipo || 'Otros';
+      resumen[tipo] = (resumen[tipo] || 0) + 1;
+    });
+    listaResumen.innerHTML = Object.entries(resumen).map(([k, v]) => `<li>${escapeHtml(k)}: ${v}</li>`).join('');
+  };
 
-document.getElementById('chkHidrografia').addEventListener('change', (e) => {
-  toggleLayer(e.target.checked, layerHidrografia);
-});
+// === BUSCADOR (por nombre) ===
+const searchInput = document.getElementById('search-input');
+const btnBuscar = document.getElementById('btn-buscar');
+const listResultados = document.getElementById('search-results');
+const tablaEquipamientos = document.querySelector('#tabla-equipamientos tbody');
 
-document.getElementById('chkEquipamientos').addEventListener('change', (e) => {
-  toggleLayer(e.target.checked, layerEquipamientos);
-});
+function mostrarDatosEnReporte(resultado) {
+  tablaEquipamientos.innerHTML = '';
 
-document.getElementById('chkSitios').addEventListener('change', (e) => {
-  toggleLayer(e.target.checked, layerSitios);
-});
+  const { nombre, tipo, barrio, distancia } = resultado.props;
+  const fila = `
+    <tr>
+      <td>${nombre || '—'}</td>
+      <td>${tipo || resultado.tipo}</td>
+      <td>${barrio || '—'}</td>
+      <td>${distancia ? distancia.toFixed(2) : '—'}</td>
+    </tr>`;
+  tablaEquipamientos.innerHTML = fila;
+}
 
-document.getElementById('chkResultados').addEventListener('change', (e) => {
-  toggleLayer(e.target.checked, layerResultados);
-});
+function buscarPorNombre(nombre) {
+  if (!nombre) {
+    listResultados.innerHTML = '<li>Ingresa un nombre</li>';
+    return;
+  }
 
-// Función genérica para mostrar/ocultar
-function toggleLayer(visible, layer) {
-  if (visible) {
-    map.addLayer(layer);
-  } else {
-    map.removeLayer(layer);
+  nombre = nombre.toLowerCase();
+  const capas = [
+    { nombre: 'Barrios', layer: layerBarrio },
+    { nombre: 'Sitios de Interés', layer: layerSitios },
+    { nombre: 'Equipamientos', layer: layerEquipamientos }
+  ];
+
+  let encontrados = [];
+
+  capas.forEach(({ nombre: tipo, layer }) => {
+    layer.eachLayer(l => {
+      const props = l.feature?.properties || {};
+      if (props.nombre?.toLowerCase().includes(nombre)) {
+        encontrados.push({ tipo, layer: l, props });
+      }
+    });
+  });
+
+  if (encontrados.length === 0) {
+    listResultados.innerHTML = '<li>Sin coincidencias</li>';
+    tablaEquipamientos.innerHTML = '';
+    return;
+  }
+
+
+  listResultados.innerHTML = encontrados.map((r, i) =>
+    `<li data-i="${i}" style="cursor:pointer;">${r.props.nombre} <em>(${r.tipo})</em></li>`
+  ).join('');
+
+  listResultados.querySelectorAll('li').forEach(li => {
+    li.addEventListener('click', () => {
+      const r = encontrados[li.dataset.i];
+      const bounds = r.layer.getBounds?.() || L.latLngBounds(r.layer.getLatLng(), r.layer.getLatLng());
+      map.fitBounds(bounds.pad(1.5));
+
+      if (r.layer.getPopup()) r.layer.openPopup();
+      else r.layer.bindPopup(`<b>${r.props.nombre}</b><br>${r.tipo}`).openPopup();
+
+      mostrarDatosEnReporte(r);
+    });
+  });
+
+  if (encontrados.length === 1) {
+    const r = encontrados[0];
+    const bounds = r.layer.getBounds?.() || L.latLngBounds(r.layer.getLatLng(), r.layer.getLatLng());
+    map.fitBounds(bounds.pad(1.5));
+    if (r.layer.getPopup()) r.layer.openPopup();
+    else r.layer.bindPopup(`<b>${r.props.nombre}</b><br>${r.tipo}`).openPopup();
+
+    mostrarDatosEnReporte(r);
   }
 }
+
+btnBuscar.addEventListener('click', () => buscarPorNombre(searchInput.value));
+searchInput.addEventListener('keypress', e => {
+  if (e.key === 'Enter') buscarPorNombre(searchInput.value);
+});
+
 })();

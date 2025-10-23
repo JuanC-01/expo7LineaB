@@ -358,3 +358,50 @@ body {
   margin-right: 6px;
   accent-color: #1d4ed8;
 }
+
+
+.panel {
+  position: absolute;
+  top: 700px;
+  right: 10px;
+  background: white;
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  z-index: 1000;
+  width: 220px;
+  font-size: 14px;
+}
+
+.panel1 {
+  position: absolute;
+  top: 80px;
+  left: 150px;
+  background: rgba(255, 255, 255, 0.226);
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  z-index: 1000;
+  width: 220px;
+  font-size: 14px;
+}
+#panel-reportes {
+  right: 10px;
+  left: auto;
+  width: 300px;
+}
+
+.subpanel {
+  margin-top: 10px;
+}
+
+#tabla-equipamientos {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#tabla-equipamientos th, #tabla-equipamientos td {
+  border: 1px solid #ccc;
+  padding: 4px;
+  text-align: left;
+}

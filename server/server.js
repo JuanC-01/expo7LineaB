@@ -13,6 +13,7 @@ const poligonosRoutes = require('./routes/poligonosRoutes');
 const hidrografiaRouter = require('./routes/hidrografiaRoutes');
 const sitiosRouter = require('./routes/sitiosRoutes');
 const equipamientosRoutes = require('./routes/equipamientosRoutes');
+const consultasRoutes = require('./routes/consultasRoutes');
 
 // Registrar rutas con prefijos
 app.use('/api/lineas', lineasRoutes);
@@ -21,6 +22,8 @@ app.use('/api/poligonos', poligonosRoutes);
 app.use('/api/hidrografia', hidrografiaRouter);
 app.use('/api/sitios', sitiosRouter);
 app.use('/api/equipamientos', equipamientosRoutes);
+app.use('/api/consultas', consultasRoutes);
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
