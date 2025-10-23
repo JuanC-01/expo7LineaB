@@ -93,3 +93,57 @@ export async function updateSitio(id, feature) {
 export async function deleteSitio(id) {
   return await fetch(`${API_BASE}/sitios/${id}`, { method: 'DELETE' });
 }
+
+// === API EQUIPAMIENTOS ===
+export async function getEquipamientos(filtros = {}) {
+  const params = new URLSearchParams();
+  if (filtros.tipo) params.append('tipo', Array.isArray(filtros.tipo) ? filtros.tipo.join(',') : filtros.tipo);
+  if (filtros.nombre) params.append('nombre', filtros.nombre);
+
+  const url = `${API_BASE}/equipamientos?${params.toString()}`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Error al obtener equipamientos: ${response.statusText}`);
+  return await response.json();
+}
+
+export async function createEquipamiento(feature) {
+  const dataToSend = {
+    ...feature.properties,
+    geometry: feature.geometry
+  };
+
+  const response = await fetch(`${API_BASE}/equipamientos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(dataToSend)
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error("Respuesta del servidor:", errText);
+    throw new Error(`Error al crear equipamiento: ${response.statusText}`);
+  }
+
+  return await response.json();
+}
+
+
+export async function updateEquipamiento(gid, feature) {
+    const dataToSend = { ...feature.properties, geometry: feature.geometry };
+    const response = await fetch(`${API_BASE}/equipamientos/${gid}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dataToSend) 
+    });
+    if (!response.ok) throw new Error(`Error al actualizar equipamiento ${gid}: ${response.statusText}`);
+    return await response.json();
+}
+
+
+export async function deleteEquipamiento(gid) {
+  const response = await fetch(`${API_BASE}/equipamientos/${gid}`, {
+    method: 'DELETE'
+  });
+  if (!response.ok) throw new Error(`Error al eliminar equipamiento ${gid}: ${response.statusText}`);
+  return await response.json();
+}

@@ -4,12 +4,13 @@ import {
   layerBarrio, addLegend, toggleLabels, filtrarBarrios,
   layerPoligonos, cargarPoligonos,
   layerHidrografia, cargarHidrografia,
-  layerSitios, cargarSitios   // ✅ agregado
+  layerSitios, cargarSitios,
+  layerEquipamientos, cargarEquipamientos, setupEquipamientoEventHandlers 
 } from './layers.js';
 import {
   createLinea, updateLinea, deleteLinea,
   createPoligono, updatePoligono, deletePoligono,
-  createSitio, updateSitio, deleteSitio           // ✅ CRUD sitios
+  createSitio, updateSitio, deleteSitio, createEquipamiento 
 } from './api.js';
 import { showForm, showConfirm } from './ui.js';
 
@@ -21,8 +22,11 @@ import { showForm, showConfirm } from './ui.js';
   layerLineas.addTo(map);
   layerPoligonos.addTo(map);
   layerHidrografia.addTo(map);
-  layerSitios.addTo(map);   // ✅ Sitios de Interés
+  layerSitios.addTo(map);
+  layerEquipamientos.addTo(map);   
   editableLayers.addTo(map);
+
+  setupEquipamientoEventHandlers(map);  
 
   // === Cargar TODOS los barrios ===
   async function cargarTodosLosBarrios() {
@@ -45,7 +49,8 @@ import { showForm, showConfirm } from './ui.js';
   await cargarLineas();
   await cargarPoligonos();
   await cargarHidrografia();
-  await cargarSitios();     // ✅ carga Sitios de Interés
+  await cargarSitios();
+  await cargarEquipamientos();      
   addLegend(map);
 
   // === Control de etiquetas ===
@@ -183,19 +188,37 @@ import { showForm, showConfirm } from './ui.js';
       }).addTo(map);
     }
   });
-// === Eventos de dibujo ===
-map.on(L.Draw.Event.CREATED, async e => {
+
+  // === Eventos de dibujo ===
+  map.on(L.Draw.Event.CREATED, async e => {
   const layer = e.layer;
   const feature = layer.toGeoJSON();
 
-  // Detectar tipo geométrico
-  const tipo = feature.geometry.type === 'Polygon'
-    ? 'polígono'
-    : feature.geometry.type === 'LineString'
-      ? 'línea'
-      : 'sitio'; // ✅ para Point
+  let tipo;
 
-  // Mostrar formulario y capturar propiedades
+  if (feature.geometry.type === 'Polygon') {
+    tipo = 'polígono';
+  } else if (feature.geometry.type === 'LineString') {
+    tipo = 'línea';
+  } else if (feature.geometry.type === 'Point') {
+    const { value: tipoPunto } = await Swal.fire({
+      title: 'Nuevo punto',
+      text: '¿Qué tipo de punto deseas registrar?',
+      input: 'select',
+      inputOptions: {
+        sitio: 'Sitio de interés',
+        equipamiento: 'Equipamiento'
+      },
+      inputPlaceholder: 'Selecciona tipo',
+      showCancelButton: true,
+      confirmButtonText: 'Continuar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (!tipoPunto) return; 
+    tipo = tipoPunto;
+  }
+
   feature.properties = await showForm({}, tipo);
 
   try {
@@ -208,67 +231,106 @@ map.on(L.Draw.Event.CREATED, async e => {
     } else if (tipo === 'sitio') {
       await createSitio(feature);
       await cargarSitios();
+    } else if (tipo === 'equipamiento') {  
+      await createEquipamiento(feature);
+      await cargarEquipamientos();
     }
+
+    Swal.fire( 'Elemento creado correctamente', 'success');
   } catch (err) {
     console.error('Error al crear elemento:', err);
-    Swal.fire('❌', 'Error al crear el elemento', 'error');
+    Swal.fire('Error al crear el elemento', 'error');
   }
 });
 
-map.on(L.Draw.Event.EDITED, async e => {
-  try {
-    for (const id in e.layers._layers) {
-      const layer = e.layers._layers[id];
-      const feature = layer.toGeoJSON();
-      const fid = feature.properties?.id;
-      if (!fid) continue;
 
-      if (feature.geometry.type === 'Polygon') {
-        await updatePoligono(fid, feature);
-      } else if (feature.geometry.type === 'LineString') {
-        await updateLinea(fid, feature);
-      } else if (feature.geometry.type === 'Point') {
-        await updateSitio(fid, feature);
+  map.on(L.Draw.Event.EDITED, async e => {
+    try {
+      for (const id in e.layers._layers) {
+        const layer = e.layers._layers[id];
+        const feature = layer.toGeoJSON();
+        const fid = feature.properties?.id;
+        if (!fid) continue;
+
+        if (feature.geometry.type === 'Polygon') {
+          await updatePoligono(fid, feature);
+        } else if (feature.geometry.type === 'LineString') {
+          await updateLinea(fid, feature);
+        } else if (feature.geometry.type === 'Point') {
+          await updateSitio(fid, feature);
+        }
       }
+
+      await Promise.all([
+        cargarPoligonos(),
+        cargarLineas(),
+        cargarSitios(),
+        cargarEquipamientos()   
+      ]);
+    } catch (err) {
+      console.error('Error al editar elemento:', err);
+      Swal.fire('Error al editar el elemento', 'error');
     }
+  });
 
-    await Promise.all([
-      cargarPoligonos(),
-      cargarLineas(),
-      cargarSitios()
-    ]);
-  } catch (err) {
-    console.error('Error al editar elemento:', err);
-    Swal.fire('❌', 'Error al editar el elemento', 'error');
-  }
-});
+  map.on(L.Draw.Event.DELETED, async e => {
+    try {
+      for (const id in e.layers._layers) {
+        const layer = e.layers._layers[id];
+        const fid = layer.feature?.properties?.id;
+        if (!fid) continue;
 
-map.on(L.Draw.Event.DELETED, async e => {
-  try {
-    for (const id in e.layers._layers) {
-      const layer = e.layers._layers[id];
-      const fid = layer.feature?.properties?.id;
-      if (!fid) continue;
-
-      if (layer.feature.geometry.type === 'Polygon') {
-        if (await showConfirm('¿Eliminar este polígono?')) await deletePoligono(fid);
-      } else if (layer.feature.geometry.type === 'LineString') {
-        if (await showConfirm('¿Eliminar esta línea?')) await deleteLinea(fid);
-      } else if (layer.feature.geometry.type === 'Point') {
-        if (await showConfirm('¿Eliminar este sitio de interés?')) await deleteSitio(fid);
+        if (layer.feature.geometry.type === 'Polygon') {
+          if (await showConfirm('¿Eliminar este polígono?')) await deletePoligono(fid);
+        } else if (layer.feature.geometry.type === 'LineString') {
+          if (await showConfirm('¿Eliminar esta línea?')) await deleteLinea(fid);
+        } else if (layer.feature.geometry.type === 'Point') {
+          if (await showConfirm('¿Eliminar este sitio de interés?')) await deleteSitio(fid);
+        }
       }
-    }
 
-    await Promise.all([
-      cargarPoligonos(),
-      cargarLineas(),
-      cargarSitios()
-    ]);
-  } catch (err) {
-    console.error('Error al eliminar elemento:', err);
-    Swal.fire('', 'Error al eliminar el elemento', 'error');
-  }
+      await Promise.all([
+        cargarPoligonos(),
+        cargarLineas(),
+        cargarSitios(),
+        cargarEquipamientos()  
+      ]);
+    } catch (err) {
+      console.error('Error al eliminar elemento:', err);
+      Swal.fire('', 'Error al eliminar el elemento', 'error');
+    }
+  });
+
+  let layerResultados = L.geoJSON(null, { color: 'orange' }); //
+map.addLayer(layerResultados); 
+
+// Asocia cada checkbox a una capa
+document.getElementById('chkBarrios').addEventListener('change', (e) => {
+  toggleLayer(e.target.checked, layerBarrio);
 });
 
+document.getElementById('chkHidrografia').addEventListener('change', (e) => {
+  toggleLayer(e.target.checked, layerHidrografia);
+});
 
+document.getElementById('chkEquipamientos').addEventListener('change', (e) => {
+  toggleLayer(e.target.checked, layerEquipamientos);
+});
+
+document.getElementById('chkSitios').addEventListener('change', (e) => {
+  toggleLayer(e.target.checked, layerSitios);
+});
+
+document.getElementById('chkResultados').addEventListener('change', (e) => {
+  toggleLayer(e.target.checked, layerResultados);
+});
+
+// Función genérica para mostrar/ocultar
+function toggleLayer(visible, layer) {
+  if (visible) {
+    map.addLayer(layer);
+  } else {
+    map.removeLayer(layer);
+  }
+}
 })();

@@ -322,3 +322,39 @@ body {
 .route-control button:hover {
   background: #005ccc;
 }
+
+
+#panel-capas {
+  position: absolute;
+  top: 290px;
+  right: 10px;
+  z-index: 1000;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  padding: 12px 16px;
+  font-family: 'Segoe UI', sans-serif;
+  font-size: 14px;
+  width: 180px;
+  transition: all 0.3s ease;
+}
+
+#panel-capas h3 {
+  font-size: 16px;
+  margin-top: 0;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 4px;
+  text-align: center;
+}
+
+#panel-capas label {
+  display: block;
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+
+#panel-capas input[type="checkbox"] {
+  margin-right: 6px;
+  accent-color: #1d4ed8;
+}

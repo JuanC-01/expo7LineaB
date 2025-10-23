@@ -5,53 +5,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Leaflet + PostGIS - Florencia</title>
 
-  <!-- Leaflet primero -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <!-- Leaflet Draw -->
-  <link
-    rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"
-  />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
-  <!-- ✅ Routing Machine (después de Leaflet) -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css"
-  />
+  <!-- Routing Machine -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
   <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
 
-  <!-- ✅ Geocoder (también después de Leaflet) -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"
-  />
+  <!-- Geocoder -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
   <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
   <!-- SweetAlert2 -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-  <!-- Estilos -->
+  <!-- MarkerCluster -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <!-- Tus estilos -->
   <link rel="stylesheet" href="css/styles.css" />
-
-  <!-- Leaflet MarkerCluster -->
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"
-/>
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
-/>
-<script
-  src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js">
-</script>
-
 </head>
 
 <body>
@@ -60,9 +39,19 @@
     <div class="legend">Puntos (azul), rutas (rojo), zonas (verde)</div>
   </div>
 
+  <!-- ✅ PANEL DE CAPAS -->
+  <div id="panel-capas" class="panel">
+    <h3>Capas</h3>
+    <label><input type="checkbox" id="chkBarrios" checked> Barrios</label><br>
+    <label><input type="checkbox" id="chkHidrografia" checked> Hidrografía</label><br>
+    <label><input type="checkbox" id="chkEquipamientos" checked> Equipamientos</label><br>
+    <label><input type="checkbox" id="chkSitios" checked> Sitios de interés</label><br>
+    <label><input type="checkbox" id="chkResultados"> Resultados</label>
+  </div>
+
   <div id="map"></div>
 
-  <!-- Tu script -->
+  <!-- Tu script principal -->
   <script type="module" src="js/main.js"></script>
 </body>
 </html>
